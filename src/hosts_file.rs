@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, self};
 use super::{DataLine, DataParseError, Line};
@@ -36,6 +39,11 @@ impl<R: BufRead> HostsFile<R> {
     pub fn data_lines(self) -> DataLines<R> {
         DataLines { inner: self.inner.lines() }
     }
+
+    /// Gets a minimal list of lines for this file.
+    pub fn minimal_lines(self) -> Result<Vec<DataLine>, LineReadError> {
+        self.data_lines().into_minimal()
+    }
 }
 
 /// Error found when reading a line in `/etc/hosts`.
@@ -55,6 +63,28 @@ impl From<io::Error> for LineReadError {
 impl From<DataParseError> for LineReadError {
     fn from(err: DataParseError) -> LineReadError {
         LineReadError::Parse(err)
+    }
+}
+impl Error for LineReadError {
+    fn description(&self) -> &str {
+        match *self {
+            LineReadError::Read(ref err) => err.description(),
+            LineReadError::Parse(ref err) => err.description(),
+        }
+    }
+    fn cause(&self) -> Option<&Error> {
+        Some(match *self {
+            LineReadError::Read(ref err) => err,
+            LineReadError::Parse(ref err) => err
+        })
+    }
+}
+impl fmt::Display for LineReadError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            LineReadError::Read(ref err) => fmt::Display::fmt(err, f),
+            LineReadError::Parse(ref err) => fmt::Display::fmt(err, f),
+        }
     }
 }
 
@@ -77,6 +107,21 @@ impl<R: BufRead> Iterator for Lines<R> {
 /// Iterator over the lines in `/etc/hosts` with data.
 pub struct DataLines<R: BufRead> {
     inner: io::Lines<R>,
+}
+impl<R: BufRead> DataLines<R> {
+    /// Merges similar IPs to create a minimal list of lines.
+    pub fn into_minimal(self) -> Result<Vec<DataLine>, LineReadError> {
+        let mut lines = BTreeMap::new();
+        for line in self {
+            let line = line?;
+            lines.entry(line.ip()).or_insert_with(Vec::new).extend(line.hosts().map(ToOwned::to_owned));
+        }
+        Ok(lines.into_iter().map(|(ip, mut hosts)| {
+            hosts.sort();
+            hosts.dedup();
+            DataLine::from_raw(ip, hosts.iter().collect())
+        }).collect())
+    }
 }
 impl<R: BufRead> Iterator for DataLines<R> {
     type Item = Result<DataLine, LineReadError>;
@@ -121,6 +166,26 @@ mod tests {
 8.8.4.4  gdns2
 ";
 
+    static BIG: &str = "\
+127.0.0.1  locahost
+::1  localhost.localdomain
+::1  lh
+127.0.0.1  lh
+0.0.0.0  allzeros
+8.8.8.8  gdns
+0.0.0.0  lotsazeros
+8.8.4.4  gdns2
+8.8.8.8  google-dns
+";
+
+    static SMALL: &str = "\
+0.0.0.0  allzeros lotsazeros
+8.8.4.4  gdns2
+8.8.8.8  gdns google-dns
+127.0.0.1  lh locahost
+::1  lh localhost.localdomain
+";
+
     #[test]
     fn lines() {
         let mut rewritten = String::new();
@@ -139,5 +204,14 @@ mod tests {
             writeln!(rewritten, "{}", line).unwrap();
         }
         assert_eq!(rewritten, PLAIN);
+    }
+
+    #[test]
+    fn minimal_lines() {
+        let mut rewritten = String::new();
+        for line in HostsFile::read_buffered(BIG.as_bytes()).minimal_lines().unwrap() {
+            writeln!(rewritten, "{}", line).unwrap();
+        }
+        assert_eq!(rewritten, SMALL);
     }
 }

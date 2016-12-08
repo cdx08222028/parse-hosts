@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fmt;
 use std::net::{AddrParseError, IpAddr, Ipv4Addr};
 use std::str::FromStr;
@@ -17,6 +18,11 @@ pub struct DataLine {
     hosts: StringVec,
 }
 impl DataLine {
+    /// Creates a new line from its raw parts.
+    pub fn from_raw(ip: IpAddr, hosts: StringVec) -> DataLine {
+        DataLine { ip, hosts }
+    }
+
     /// Gets the IP for this line.
     pub fn ip(&self) -> IpAddr {
         self.ip
@@ -57,10 +63,53 @@ pub enum DataParseError {
     HostWasIp(Ipv4Addr),
 
     /// The given host had an invalid character.
-    BadHost(char),
+    BadHost(char, String),
 
     /// The IP failed to parse.
-    BadIp(AddrParseError),
+    BadIp(AddrParseError, String),
+}
+impl Error for DataParseError {
+    fn description(&self) -> &str {
+        match *self {
+            DataParseError::NoInternalSpace => {
+                "line had no space between IP and hosts"
+            }
+            DataParseError::HostWasIp(_) => {
+                "an IP was given where a domain should have been"
+            }
+            DataParseError::BadHost(_, _) => {
+                "a host was invalid because it contains an invalid character"
+            }
+            DataParseError::BadIp(_, _) => {
+                "could not parse IP"
+            }
+        }
+    }
+    fn cause(&self) -> Option<&Error> {
+        if let DataParseError::BadIp(ref err, _) = *self {
+            Some(err)
+        } else {
+            None
+        }
+    }
+}
+impl fmt::Display for DataParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            DataParseError::NoInternalSpace => {
+                write!(f, "line had no space between IP and hosts")
+            }
+            DataParseError::HostWasIp(ref ip) => {
+                write!(f, "the IP {} was given instead of a domain", ip)
+            }
+            DataParseError::BadHost(ref ch, ref host) => {
+                write!(f, "the host {:?} is invalid because it contains {:?}", host, ch)
+            }
+            DataParseError::BadIp(_, ref ip) => {
+                write!(f, "could not parse {:?} as an IP", ip)
+            }
+        }
+    }
 }
 
 impl FromStr for DataLine {
@@ -68,12 +117,14 @@ impl FromStr for DataLine {
     fn from_str(s: &str) -> Result<DataLine, DataParseError> {
         let s = s.trim();
         if let Some(idx) = s.find(char::is_whitespace) {
-            let ip = s[..idx].parse().map_err(DataParseError::BadIp)?;
+            let ip = s[..idx].parse().map_err(|err| DataParseError::BadIp(err,
+                                                                          s[..idx].to_owned()))?;
             let mut hosts = StringVec::new();
             for host in s[idx..].split_whitespace() {
                 // https://url.spec.whatwg.org/#host-parsing
                 if let Some(idx) = host.find(INVALID_CHARS) {
-                    return Err(DataParseError::BadHost(s[idx..].chars().next().unwrap()))
+                    return Err(DataParseError::BadHost(host[idx..].chars().next().unwrap(),
+                                                       host.to_owned()))
                 } else if let Ok(ipv4) = host.parse(): Result<Ipv4Addr, _> {
                     return Err(DataParseError::HostWasIp(ipv4))
                 } else {
@@ -111,7 +162,8 @@ mod tests {
     #[test]
     fn wrong_order() {
         let line: Result<DataLine, _> = "localhost ::1".parse();
-        if let Err(DataParseError::BadIp(_)) = line {
+        if let Err(DataParseError::BadIp(_, ip)) = line {
+            assert_eq!(ip, "localhost");
         } else {
             panic!("not a bad IP: {:?}", line);
         }
@@ -129,8 +181,9 @@ mod tests {
 
     #[test]
     fn two_ipv6() {
-        let line: Result<DataLine, _> = "::1 ::1".parse();
-        if let Err(DataParseError::BadHost(':')) = line {
+        let line: Result<DataLine, _> = "::1 localhost ::1".parse();
+        if let Err(DataParseError::BadHost(':', host)) = line {
+            assert_eq!(host, "::1");
         } else {
             panic!("not a bad host: {:?}", line);
         }
@@ -141,6 +194,14 @@ mod tests {
         let line: DataLine = "::1 localhost localhost.localdomain lh".parse().unwrap();
         assert_eq!(line.ip(), IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)));
         let hosts: Vec<&str> = line.hosts().collect();
-        assert_eq!(hosts, vec!["localhost", "localhost.localdomain", "lh"]);
+        assert_eq!(hosts, &["localhost", "localhost.localdomain", "lh"]);
+    }
+
+    #[test]
+    fn ascii_host() {
+        let line: DataLine = "::1 the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com".parse().unwrap();
+        assert_eq!(line.ip(), IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)));
+        let hosts: Vec<&str> = line.hosts().collect();
+        assert_eq!(hosts, &["the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com"]);
     }
 }
