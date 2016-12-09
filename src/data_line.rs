@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 use std::net::{AddrParseError, IpAddr, Ipv4Addr};
@@ -31,6 +32,19 @@ impl DataLine {
     /// Iterates over the hosts on this line.
     pub fn hosts(&self) -> Hosts {
         Hosts { inner: Some(self.hosts.iter()) }
+    }
+}
+
+/// Minifies a list of data lines.`
+pub fn minify_lines(lines: &mut Vec<DataLine>) {
+    let mut min = BTreeMap::new();
+    for line in lines.drain(..) {
+        min.entry(line.ip()).or_insert_with(Vec::new).extend(line.hosts().map(ToOwned::to_owned));
+    }
+    for (ip, mut hosts) in min {
+        hosts.sort();
+        hosts.dedup();
+        lines.push(DataLine::from_raw(ip, hosts.iter().collect()));
     }
 }
 

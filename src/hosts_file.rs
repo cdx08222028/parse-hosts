@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
@@ -38,11 +37,6 @@ impl<R: BufRead> HostsFile<R> {
     /// Iterates over the lines in the file with data.
     pub fn data_lines(self) -> DataLines<R> {
         DataLines { inner: self.inner.lines() }
-    }
-
-    /// Gets a minimal list of lines for this file.
-    pub fn minimal_lines(self) -> Result<Vec<DataLine>, LineReadError> {
-        self.data_lines().into_minimal()
     }
 }
 
@@ -107,21 +101,6 @@ impl<R: BufRead> Iterator for Lines<R> {
 /// Iterator over the lines in `/etc/hosts` with data.
 pub struct DataLines<R: BufRead> {
     inner: io::Lines<R>,
-}
-impl<R: BufRead> DataLines<R> {
-    /// Merges similar IPs to create a minimal list of lines.
-    pub fn into_minimal(self) -> Result<Vec<DataLine>, LineReadError> {
-        let mut lines = BTreeMap::new();
-        for line in self {
-            let line = line?;
-            lines.entry(line.ip()).or_insert_with(Vec::new).extend(line.hosts().map(ToOwned::to_owned));
-        }
-        Ok(lines.into_iter().map(|(ip, mut hosts)| {
-            hosts.sort();
-            hosts.dedup();
-            DataLine::from_raw(ip, hosts.iter().collect())
-        }).collect())
-    }
 }
 impl<R: BufRead> Iterator for DataLines<R> {
     type Item = Result<DataLine, LineReadError>;
@@ -204,14 +183,5 @@ mod tests {
             writeln!(rewritten, "{}", line).unwrap();
         }
         assert_eq!(rewritten, PLAIN);
-    }
-
-    #[test]
-    fn minimal_lines() {
-        let mut rewritten = String::new();
-        for line in HostsFile::read_buffered(BIG.as_bytes()).minimal_lines().unwrap() {
-            writeln!(rewritten, "{}", line).unwrap();
-        }
-        assert_eq!(rewritten, SMALL);
     }
 }
