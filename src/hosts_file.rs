@@ -4,6 +4,12 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, self};
 use super::{DataLine, DataParseError, Line};
 
+/// Shorthand for `HostsFile<BufReader<R>>`.
+pub type BufHostsFile<R: Read> = HostsFile<BufReader<R>>;
+
+/// Shorthand for `HostsFile<BufReader<File>>`.
+pub type ActualHostsFile = HostsFile<BufReader<File>>;
+
 /// Representation of `/etc/hosts`.
 pub struct HostsFile<R: BufRead> {
     inner: R,
