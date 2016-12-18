@@ -97,8 +97,8 @@ impl<R: BufRead> Iterator for Lines<R> {
     fn next(&mut self) -> Option<Result<Line<'static>, LineReadError>> {
         self.inner.next().map(|line| {
             match line {
-                Err(err) => return Err(err.into()),
-                Ok(line) => return line.parse().map_err(Into::into).map(Line::into_owned),
+                Err(err) => Err(err.into()),
+                Ok(line) => line.parse().map_err(Into::into).map(Line::into_owned),
             }
         })
     }
@@ -149,26 +149,6 @@ mod tests {
 0.0.0.0  allzeros
 8.8.8.8  gdns
 8.8.4.4  gdns2
-";
-
-    static BIG: &str = "\
-127.0.0.1  locahost
-::1  localhost.localdomain
-::1  lh
-127.0.0.1  lh
-0.0.0.0  allzeros
-8.8.8.8  gdns
-0.0.0.0  lotsazeros
-8.8.4.4  gdns2
-8.8.8.8  google-dns
-";
-
-    static SMALL: &str = "\
-0.0.0.0  allzeros lotsazeros
-8.8.4.4  gdns2
-8.8.8.8  gdns google-dns
-127.0.0.1  lh locahost
-::1  lh localhost.localdomain
 ";
 
     #[test]

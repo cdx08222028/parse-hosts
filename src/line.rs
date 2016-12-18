@@ -70,7 +70,7 @@ impl<'a> Line<'a> {
 
     /// Gets the IP for this line.
     pub fn hosts(&self) -> Hosts {
-        if let Some(ref data) = self.data.as_ref() {
+        if let Some(data) = self.data.as_ref() {
             data.hosts()
         } else {
             empty_hosts()
