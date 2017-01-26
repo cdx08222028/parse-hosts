@@ -7,10 +7,8 @@ use multistr::StringVec;
 use multistr::vec::Iter as SVIter;
 
 /// Characters which aren't allowed in URLs.
-static INVALID_CHARS: &[char] = &[
-    '\0', '\u{0009}', '\u{000a}', '\u{000d}', '\u{0020}',
-    '#', '%', '/', ':', '?', '@', '[', '\\', ']'
-];
+static INVALID_CHARS: &[char] = &['\0', '\u{0009}', '\u{000a}', '\u{000d}', '\u{0020}', '#', '%',
+                                  '/', ':', '?', '@', '[', '\\', ']'];
 
 /// Data from a line in `/etc/hosts`.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -21,7 +19,10 @@ pub struct DataLine {
 impl DataLine {
     /// Creates a new line from its raw parts.
     pub fn from_raw(ip: IpAddr, hosts: StringVec) -> DataLine {
-        DataLine { ip, hosts }
+        DataLine {
+            ip: ip,
+            hosts: hosts,
+        }
     }
 
     /// Gets the IP for this line.
@@ -85,18 +86,12 @@ pub enum DataParseError {
 impl Error for DataParseError {
     fn description(&self) -> &str {
         match *self {
-            DataParseError::NoInternalSpace => {
-                "line had no space between IP and hosts"
-            }
-            DataParseError::HostWasIp(_) => {
-                "an IP was given where a domain should have been"
-            }
+            DataParseError::NoInternalSpace => "line had no space between IP and hosts",
+            DataParseError::HostWasIp(_) => "an IP was given where a domain should have been",
             DataParseError::BadHost(_, _) => {
                 "a host was invalid because it contains an invalid character"
             }
-            DataParseError::BadIp(_, _) => {
-                "could not parse IP"
-            }
+            DataParseError::BadIp(_, _) => "could not parse IP",
         }
     }
     fn cause(&self) -> Option<&Error> {
@@ -110,18 +105,17 @@ impl Error for DataParseError {
 impl fmt::Display for DataParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            DataParseError::NoInternalSpace => {
-                write!(f, "line had no space between IP and hosts")
-            }
+            DataParseError::NoInternalSpace => write!(f, "line had no space between IP and hosts"),
             DataParseError::HostWasIp(ref ip) => {
                 write!(f, "the IP {} was given instead of a domain", ip)
             }
             DataParseError::BadHost(ref ch, ref host) => {
-                write!(f, "the host {:?} is invalid because it contains {:?}", host, ch)
+                write!(f,
+                       "the host {:?} is invalid because it contains {:?}",
+                       host,
+                       ch)
             }
-            DataParseError::BadIp(_, ref ip) => {
-                write!(f, "could not parse {:?} as an IP", ip)
-            }
+            DataParseError::BadIp(_, ref ip) => write!(f, "could not parse {:?} as an IP", ip),
         }
     }
 }
@@ -131,21 +125,24 @@ impl FromStr for DataLine {
     fn from_str(s: &str) -> Result<DataLine, DataParseError> {
         let s = s.trim();
         if let Some(idx) = s.find(char::is_whitespace) {
-            let ip = s[..idx].parse().map_err(|err| DataParseError::BadIp(err,
-                                                                          s[..idx].to_owned()))?;
+            let ip = s[..idx].parse()
+                .map_err(|err| DataParseError::BadIp(err, s[..idx].to_owned()))?;
             let mut hosts = StringVec::new();
             for host in s[idx..].split_whitespace() {
                 // https://url.spec.whatwg.org/#host-parsing
                 if let Some(idx) = host.find(INVALID_CHARS) {
                     return Err(DataParseError::BadHost(host[idx..].chars().next().unwrap(),
-                                                       host.to_owned()))
+                                                       host.to_owned()));
                 } else if let Ok(ipv4) = host.parse(): Result<Ipv4Addr, _> {
-                    return Err(DataParseError::HostWasIp(ipv4))
+                    return Err(DataParseError::HostWasIp(ipv4));
                 } else {
                     hosts.push(host);
                 }
             }
-            Ok(DataLine { ip, hosts })
+            Ok(DataLine {
+                ip: ip,
+                hosts: hosts,
+            })
         } else {
             Err(DataParseError::NoInternalSpace)
         }
@@ -213,9 +210,11 @@ mod tests {
 
     #[test]
     fn ascii_host() {
-        let line: DataLine = "::1 the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com".parse().unwrap();
+        let line: DataLine =
+            "::1 the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com".parse().unwrap();
         assert_eq!(line.ip(), IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)));
         let hosts: Vec<&str> = line.hosts().collect();
-        assert_eq!(hosts, &["the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com"]);
+        assert_eq!(hosts,
+                   &["the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com"]);
     }
 }

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read, self};
+use std::io::{self, BufRead, BufReader, Read};
 use super::{DataLine, DataParseError, Line};
 
 /// Shorthand for `HostsFile<BufReader<R>>`.
@@ -18,9 +18,7 @@ pub struct HostsFile<R: BufRead> {
 impl HostsFile<BufReader<File>> {
     /// Loads the data from `/etc/hosts`.
     pub fn load() -> io::Result<HostsFile<BufReader<File>>> {
-        Ok(HostsFile {
-            inner: BufReader::new(File::open("/etc/hosts")?),
-        })
+        Ok(HostsFile { inner: BufReader::new(File::open("/etc/hosts")?) })
     }
 }
 impl<R: Read> HostsFile<BufReader<R>> {
@@ -75,7 +73,7 @@ impl Error for LineReadError {
     fn cause(&self) -> Option<&Error> {
         Some(match *self {
             LineReadError::Read(ref err) => err,
-            LineReadError::Parse(ref err) => err
+            LineReadError::Parse(ref err) => err,
         })
     }
 }
@@ -95,11 +93,9 @@ pub struct Lines<R: BufRead> {
 impl<R: BufRead> Iterator for Lines<R> {
     type Item = Result<Line<'static>, LineReadError>;
     fn next(&mut self) -> Option<Result<Line<'static>, LineReadError>> {
-        self.inner.next().map(|line| {
-            match line {
-                Err(err) => Err(err.into()),
-                Ok(line) => line.parse().map_err(Into::into).map(Line::into_owned),
-            }
+        self.inner.next().map(|line| match line {
+            Err(err) => Err(err.into()),
+            Ok(line) => line.parse().map_err(Into::into).map(Line::into_owned),
         })
     }
 }

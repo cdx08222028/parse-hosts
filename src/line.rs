@@ -44,7 +44,10 @@ impl<'a> Line<'a> {
         } else {
             Some(stripped.parse()?)
         };
-        Ok(Line { data, comment })
+        Ok(Line {
+            data: data,
+            comment: comment,
+        })
     }
 
     /// Creates a line directly from a comment.
@@ -83,7 +86,9 @@ impl<'a> Line<'a> {
     }
 
     /// Gets the comment from this line.
-    pub fn comment<'b>(&'b self) -> Option<&'b str> where 'a: 'b {
+    pub fn comment<'b>(&'b self) -> Option<&'b str>
+        where 'a: 'b
+    {
         self.comment.as_ref().map(|s| &**s)
     }
 
@@ -96,7 +101,7 @@ impl<'a> Line<'a> {
     pub fn into_owned(self) -> Line<'static> {
         Line {
             data: self.data,
-            comment: self.comment.map(Cow::into_owned).map(Cow::Owned)
+            comment: self.comment.map(Cow::into_owned).map(Cow::Owned),
         }
     }
 }
@@ -146,7 +151,8 @@ mod tests {
 
     #[test]
     fn parse_full() {
-        let full: Line = "127.0.0.1  \tlocalhost  \t   localhost.localdomain    lh#localhosts".parse().unwrap();
+        let full: Line =
+            "127.0.0.1  \tlocalhost  \t   localhost.localdomain    lh#localhosts".parse().unwrap();
         assert!(full.data().is_some());
         assert_eq!(full.comment().unwrap(), "localhosts");
         assert_eq!(full.ip().unwrap(), IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
