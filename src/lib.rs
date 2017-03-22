@@ -1,4 +1,4 @@
-#![feature(field_init_shorthand, static_in_const, type_ascription)]
+#![feature(type_ascription)]
 #![cfg_attr(test, feature(plugin))]
 #![cfg_attr(test, plugin(clippy))]
 
