@@ -4,7 +4,7 @@ use std::fmt;
 use std::net::{AddrParseError, IpAddr, Ipv4Addr};
 use std::str::FromStr;
 use multistr::StringVec;
-use multistr::vec::Iter as SVIter;
+use multistr::Iter as SVIter;
 
 /// Characters which aren't allowed in URLs.
 static INVALID_CHARS: &[char] = &['\0', '\u{0009}', '\u{000a}', '\u{000d}', '\u{0020}', '#', '%',
@@ -45,7 +45,7 @@ pub fn minify_lines(lines: &mut Vec<DataLine>) {
     for (ip, mut hosts) in min {
         hosts.sort();
         hosts.dedup();
-        lines.push(DataLine::from_raw(ip, hosts.iter().collect()));
+        lines.push(DataLine::from_raw(ip, hosts.iter().map(|s| &**s).collect()));
     }
 }
 
@@ -56,7 +56,7 @@ pub fn empty_hosts() -> Hosts<'static> {
 
 /// Iterator over the hosts on a line.
 pub struct Hosts<'a> {
-    inner: Option<SVIter<'a>>,
+    inner: Option<SVIter<'a, str>>,
 }
 impl<'a> Iterator for Hosts<'a> {
     type Item = &'a str;
