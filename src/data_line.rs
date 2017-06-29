@@ -133,7 +133,7 @@ impl FromStr for DataLine {
                 if let Some(idx) = host.find(INVALID_CHARS) {
                     return Err(DataParseError::BadHost(host[idx..].chars().next().unwrap(),
                                                        host.to_owned()));
-                } else if let Ok(ipv4) = host.parse(): Result<Ipv4Addr, _> {
+                } else if let Ok(ipv4) = host.parse::<Ipv4Addr>() {
                     return Err(DataParseError::HostWasIp(ipv4));
                 } else {
                     hosts.push(host);
