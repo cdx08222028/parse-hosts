@@ -1,6 +1,6 @@
 [package]
 name = "parse-hosts"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Clar Charr <clar@charr.xyz>"]
 repository = "https://github.com/clarcharr/parse-hosts"
 documentation = "https://clarcharr.github.io/parse-hosts/parse_hosts"
@@ -10,7 +10,7 @@ license-file = "LICENSE"
 exclude = [".gitignore"]
 
 [dependencies]
-multistr = "0.2"
+multistr = "0.4"
 
 [dev-dependencies]
 clippy = "^0.0"
