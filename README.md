@@ -11,7 +11,7 @@ To use in your own project, just add the below to your `Cargo.toml` file.
 
 ```toml
 [dependencies]
-parse-hosts = "0.2"
+parse-hosts = "0.4"
 ```
 
 For more formal documentation, you can find the rustdoc

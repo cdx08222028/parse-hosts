@@ -1,5 +1,10 @@
 This project follows semantic versioning.
 
+# 0.4.0
+
+* [added] `HostFile::pairs`, `DataLine::pairs`, and `DataLine::into_pairs`
+* [fixed] Bumped dependencies
+
 # 0.3.0
 
 * [changed] `minify_lines` is now a function instead of a method.

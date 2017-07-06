@@ -2,7 +2,9 @@ use std::error::Error;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
-use super::{DataLine, DataParseError, Line};
+use std::net::IpAddr;
+use super::{DataLine, DataParseError, Line, IntoPairs};
+use super::data_line::empty_pairs;
 
 /// Shorthand for `HostsFile<BufReader<R>>`.
 pub type BufHostsFile<R: Read> = HostsFile<BufReader<R>>;
@@ -41,6 +43,11 @@ impl<R: BufRead> HostsFile<R> {
     /// Iterates over the lines in the file with data.
     pub fn data_lines(self) -> DataLines<R> {
         DataLines { inner: self.inner.lines() }
+    }
+
+    /// Iterates over the IP/host pairs in the file.
+    pub fn pairs(self) -> Pairs<R> {
+        Pairs { inner: self.data_lines(), pairs: empty_pairs() }
     }
 }
 
@@ -123,14 +130,38 @@ impl<R: BufRead> Iterator for DataLines<R> {
     }
 }
 
+/// Iterator over the host/IP pairs in `/etc/hosts`.
+pub struct Pairs<R: BufRead> {
+    inner: DataLines<R>,
+    pairs: IntoPairs,
+}
+impl<R: BufRead> Iterator for Pairs<R> {
+    type Item = Result<(String, IpAddr), LineReadError>;
+    fn next(&mut self) -> Option<Result<(String, IpAddr), LineReadError>> {
+        loop {
+            if let Some(next) = self.pairs.next() {
+                return Some(Ok(next));
+            }
+            match self.inner.next() {
+                Some(Ok(line)) => {
+                    self.pairs = line.into_pairs();
+                },
+                Some(Err(e)) => return Some(Err(e)),
+                None => return None,
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::fmt::Write;
     use super::*;
 
     static PRETTY: &str = "\
 # basic ones
-127.0.0.1  locahost localhost.localdomain
+127.0.0.1  localhost localhost.localdomain
 0.0.0.0  allzeros  # nonstandard
 
 # others
@@ -141,7 +172,7 @@ mod tests {
 ";
 
     static PLAIN: &str = "\
-127.0.0.1  locahost localhost.localdomain
+127.0.0.1  localhost localhost.localdomain
 0.0.0.0  allzeros
 8.8.8.8  gdns
 8.8.4.4  gdns2
@@ -165,5 +196,16 @@ mod tests {
             writeln!(rewritten, "{}", line).unwrap();
         }
         assert_eq!(rewritten, PLAIN);
+    }
+
+    #[test]
+    fn pairs() {
+        let mut map = HashMap::new();
+        map.extend(HostsFile::read_buffered(PRETTY.as_bytes()).pairs().map(Result::unwrap));
+        assert_eq!(*map.get("localhost").unwrap(), "127.0.0.1".parse::<IpAddr>().unwrap());
+        assert_eq!(*map.get("localhost.localdomain").unwrap(), "127.0.0.1".parse::<IpAddr>().unwrap());
+        assert_eq!(*map.get("allzeros").unwrap(), "0.0.0.0".parse::<IpAddr>().unwrap());
+        assert_eq!(*map.get("gdns").unwrap(), "8.8.8.8".parse::<IpAddr>().unwrap());
+        assert_eq!(*map.get("gdns2").unwrap(), "8.8.4.4".parse::<IpAddr>().unwrap());
     }
 }

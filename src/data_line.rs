@@ -34,6 +34,16 @@ impl DataLine {
     pub fn hosts(&self) -> Hosts {
         Hosts { inner: Some(self.hosts.iter()) }
     }
+
+    /// Expands this line, iterating over its host/IP pairs.
+    pub fn pairs(&self) -> LinePairs {
+        LinePairs { ip: self.ip, hosts: self.hosts.iter() }
+    }
+
+    /// Expands this line, iterating over its host/IP pairs. (owned version)
+    pub fn into_pairs(self) -> IntoPairs {
+        IntoPairs { ip: self.ip, hosts: self.hosts }
+    }
 }
 
 /// Minifies a list of data lines.`
@@ -53,6 +63,9 @@ pub fn minify_lines(lines: &mut Vec<DataLine>) {
 pub fn empty_hosts() -> Hosts<'static> {
     Hosts { inner: None }
 }
+pub fn empty_pairs() -> IntoPairs {
+    IntoPairs { ip: IpAddr::from([0, 0, 0, 0]), hosts: StringVec::new() }
+}
 
 /// Iterator over the hosts on a line.
 pub struct Hosts<'a> {
@@ -62,6 +75,30 @@ impl<'a> Iterator for Hosts<'a> {
     type Item = &'a str;
     fn next(&mut self) -> Option<&'a str> {
         self.inner.as_mut().and_then(|inner| inner.next())
+    }
+}
+
+/// Iterator over the host/IP pairs on a line.
+pub struct LinePairs<'a> {
+    ip: IpAddr,
+    hosts: SVIter<'a, str>,
+}
+impl<'a> Iterator for LinePairs<'a> {
+    type Item = (&'a str, IpAddr);
+    fn next(&mut self) -> Option<(&'a str, IpAddr)> {
+        self.hosts.next().map(|h| (h, self.ip))
+    }
+}
+
+/// Iterator over the host/IP pairs on a line. (owned version)
+pub struct IntoPairs {
+    ip: IpAddr,
+    hosts: StringVec,
+}
+impl Iterator for IntoPairs {
+    type Item = (String, IpAddr);
+    fn next(&mut self) -> Option<(String, IpAddr)> {
+        self.hosts.pop_off().map(|h| (h, self.ip))
     }
 }
 

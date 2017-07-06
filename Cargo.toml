@@ -10,7 +10,4 @@ license-file = "LICENSE"
 exclude = [".gitignore"]
 
 [dependencies]
-multistr = "0.4"
-
-[dev-dependencies]
-clippy = "^0.0"
+multistr = "0.5"
