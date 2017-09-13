@@ -7,7 +7,7 @@ use super::{DataLine, DataParseError, Line, IntoPairs};
 use super::data_line::empty_pairs;
 
 /// Shorthand for `HostsFile<BufReader<R>>`.
-pub type BufHostsFile<R: Read> = HostsFile<BufReader<R>>;
+pub type BufHostsFile<R> = HostsFile<BufReader<R>>;
 
 /// Shorthand for `HostsFile<BufReader<File>>`.
 pub type ActualHostsFile = HostsFile<BufReader<File>>;
