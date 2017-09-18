@@ -87,7 +87,8 @@ impl<'a> Line<'a> {
 
     /// Gets the comment from this line.
     pub fn comment<'b>(&'b self) -> Option<&'b str>
-        where 'a: 'b
+    where
+        'a: 'b,
     {
         self.comment.as_ref().map(|s| &**s)
     }
@@ -151,8 +152,9 @@ mod tests {
 
     #[test]
     fn parse_full() {
-        let full: Line =
-            "127.0.0.1  \tlocalhost  \t   localhost.localdomain    lh#localhosts".parse().unwrap();
+        let full: Line = "127.0.0.1  \tlocalhost  \t   localhost.localdomain    lh#localhosts"
+            .parse()
+            .unwrap();
         assert!(full.data().is_some());
         assert_eq!(full.comment().unwrap(), "localhosts");
         assert_eq!(full.ip().unwrap(), IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));

@@ -7,8 +7,22 @@ use multistr::StringVec;
 use multistr::Iter as SVIter;
 
 /// Characters which aren't allowed in URLs.
-static INVALID_CHARS: &[char] = &['\0', '\u{0009}', '\u{000a}', '\u{000d}', '\u{0020}', '#', '%',
-                                  '/', ':', '?', '@', '[', '\\', ']'];
+static INVALID_CHARS: &[char] = &[
+    '\0',
+    '\u{0009}',
+    '\u{000a}',
+    '\u{000d}',
+    '\u{0020}',
+    '#',
+    '%',
+    '/',
+    ':',
+    '?',
+    '@',
+    '[',
+    '\\',
+    ']',
+];
 
 /// Data from a line in `/etc/hosts`.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -18,10 +32,10 @@ pub struct DataLine {
 }
 impl DataLine {
     /// Creates a new line from its raw parts.
-    pub fn from_raw(ip: IpAddr, hosts: StringVec) -> DataLine {
+    pub fn from_raw<'a, I: IntoIterator<Item = &'a str>>(ip: IpAddr, hosts: I) -> DataLine {
         DataLine {
             ip: ip,
-            hosts: hosts,
+            hosts: hosts.into_iter().collect(),
         }
     }
 
@@ -37,12 +51,18 @@ impl DataLine {
 
     /// Expands this line, iterating over its host/IP pairs.
     pub fn pairs(&self) -> LinePairs {
-        LinePairs { ip: self.ip, hosts: self.hosts.iter() }
+        LinePairs {
+            ip: self.ip,
+            hosts: self.hosts.iter(),
+        }
     }
 
     /// Expands this line, iterating over its host/IP pairs. (owned version)
     pub fn into_pairs(self) -> IntoPairs {
-        IntoPairs { ip: self.ip, hosts: self.hosts }
+        IntoPairs {
+            ip: self.ip,
+            hosts: self.hosts,
+        }
     }
 }
 
@@ -50,12 +70,14 @@ impl DataLine {
 pub fn minify_lines(lines: &mut Vec<DataLine>) {
     let mut min = BTreeMap::new();
     for line in lines.drain(..) {
-        min.entry(line.ip()).or_insert_with(Vec::new).extend(line.hosts().map(ToOwned::to_owned));
+        min.entry(line.ip()).or_insert_with(Vec::new).extend(
+            line.hosts().map(ToOwned::to_owned),
+        );
     }
     for (ip, mut hosts) in min {
         hosts.sort();
         hosts.dedup();
-        lines.push(DataLine::from_raw(ip, hosts.iter().map(|s| &**s).collect()));
+        lines.push(DataLine::from_raw(ip, hosts.iter().map(|s| &**s)));
     }
 }
 
@@ -64,7 +86,10 @@ pub fn empty_hosts() -> Hosts<'static> {
     Hosts { inner: None }
 }
 pub fn empty_pairs() -> IntoPairs {
-    IntoPairs { ip: IpAddr::from([0, 0, 0, 0]), hosts: StringVec::new() }
+    IntoPairs {
+        ip: IpAddr::from([0, 0, 0, 0]),
+        hosts: StringVec::new(),
+    }
 }
 
 /// Iterator over the hosts on a line.
@@ -147,10 +172,12 @@ impl fmt::Display for DataParseError {
                 write!(f, "the IP {} was given instead of a domain", ip)
             }
             DataParseError::BadHost(ref ch, ref host) => {
-                write!(f,
-                       "the host {:?} is invalid because it contains {:?}",
-                       host,
-                       ch)
+                write!(
+                    f,
+                    "the host {:?} is invalid because it contains {:?}",
+                    host,
+                    ch
+                )
             }
             DataParseError::BadIp(_, ref ip) => write!(f, "could not parse {:?} as an IP", ip),
         }
@@ -162,14 +189,17 @@ impl FromStr for DataLine {
     fn from_str(s: &str) -> Result<DataLine, DataParseError> {
         let s = s.trim();
         if let Some(idx) = s.find(char::is_whitespace) {
-            let ip = s[..idx].parse()
-                .map_err(|err| DataParseError::BadIp(err, s[..idx].to_owned()))?;
+            let ip = s[..idx].parse().map_err(|err| {
+                DataParseError::BadIp(err, s[..idx].to_owned())
+            })?;
             let mut hosts = StringVec::new();
             for host in s[idx..].split_whitespace() {
                 // https://url.spec.whatwg.org/#host-parsing
                 if let Some(idx) = host.find(INVALID_CHARS) {
-                    return Err(DataParseError::BadHost(host[idx..].chars().next().unwrap(),
-                                                       host.to_owned()));
+                    return Err(DataParseError::BadHost(
+                        host[idx..].chars().next().unwrap(),
+                        host.to_owned(),
+                    ));
                 } else if let Ok(ipv4) = host.parse::<Ipv4Addr>() {
                     return Err(DataParseError::HostWasIp(ipv4));
                 } else {
@@ -247,11 +277,16 @@ mod tests {
 
     #[test]
     fn ascii_host() {
-        let line: DataLine =
-            "::1 the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com".parse().unwrap();
+        let line: DataLine = "::1 the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com"
+            .parse()
+            .unwrap();
         assert_eq!(line.ip(), IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)));
         let hosts: Vec<&str> = line.hosts().collect();
-        assert_eq!(hosts,
-                   &["the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com"]);
+        assert_eq!(
+            hosts,
+            &[
+                "the-quick-brown-fox-jumped-over-the-lazy-dog-0123456789.com",
+            ]
+        );
     }
 }

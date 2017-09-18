@@ -1,5 +1,10 @@
 This project follows semantic versioning.
 
+# 0.5.0
+
+* [fixed] removed unnecessary warning; thanks @nox!
+* [changed] removed public dependency on `multistr`
+
 # 0.4.0
 
 * [added] `HostFile::pairs`, `DataLine::pairs`, and `DataLine::into_pairs`

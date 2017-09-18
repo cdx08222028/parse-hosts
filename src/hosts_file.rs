@@ -20,7 +20,9 @@ pub struct HostsFile<R: BufRead> {
 impl HostsFile<BufReader<File>> {
     /// Loads the data from `/etc/hosts`.
     pub fn load() -> io::Result<HostsFile<BufReader<File>>> {
-        Ok(HostsFile { inner: BufReader::new(File::open("/etc/hosts")?) })
+        Ok(HostsFile {
+            inner: BufReader::new(File::open("/etc/hosts")?),
+        })
     }
 }
 impl<R: Read> HostsFile<BufReader<R>> {
@@ -47,7 +49,10 @@ impl<R: BufRead> HostsFile<R> {
 
     /// Iterates over the IP/host pairs in the file.
     pub fn pairs(self) -> Pairs<R> {
-        Pairs { inner: self.data_lines(), pairs: empty_pairs() }
+        Pairs {
+            inner: self.data_lines(),
+            pairs: empty_pairs(),
+        }
     }
 }
 
@@ -145,7 +150,7 @@ impl<R: BufRead> Iterator for Pairs<R> {
             match self.inner.next() {
                 Some(Ok(line)) => {
                     self.pairs = line.into_pairs();
-                },
+                }
                 Some(Err(e)) => return Some(Err(e)),
                 None => return None,
             }
@@ -201,11 +206,28 @@ mod tests {
     #[test]
     fn pairs() {
         let mut map = HashMap::new();
-        map.extend(HostsFile::read_buffered(PRETTY.as_bytes()).pairs().map(Result::unwrap));
-        assert_eq!(*map.get("localhost").unwrap(), "127.0.0.1".parse::<IpAddr>().unwrap());
-        assert_eq!(*map.get("localhost.localdomain").unwrap(), "127.0.0.1".parse::<IpAddr>().unwrap());
-        assert_eq!(*map.get("allzeros").unwrap(), "0.0.0.0".parse::<IpAddr>().unwrap());
-        assert_eq!(*map.get("gdns").unwrap(), "8.8.8.8".parse::<IpAddr>().unwrap());
-        assert_eq!(*map.get("gdns2").unwrap(), "8.8.4.4".parse::<IpAddr>().unwrap());
+        map.extend(HostsFile::read_buffered(PRETTY.as_bytes()).pairs().map(
+            Result::unwrap,
+        ));
+        assert_eq!(
+            *map.get("localhost").unwrap(),
+            "127.0.0.1".parse::<IpAddr>().unwrap()
+        );
+        assert_eq!(
+            *map.get("localhost.localdomain").unwrap(),
+            "127.0.0.1".parse::<IpAddr>().unwrap()
+        );
+        assert_eq!(
+            *map.get("allzeros").unwrap(),
+            "0.0.0.0".parse::<IpAddr>().unwrap()
+        );
+        assert_eq!(
+            *map.get("gdns").unwrap(),
+            "8.8.8.8".parse::<IpAddr>().unwrap()
+        );
+        assert_eq!(
+            *map.get("gdns2").unwrap(),
+            "8.8.4.4".parse::<IpAddr>().unwrap()
+        );
     }
 }
